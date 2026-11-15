@@ -77,29 +77,67 @@ class Bandit(ABC):
 class Visualization:
     """Create the learning-process and comparison plots required by the report."""
 
+    def __init__(self) -> None:
+        """Initialize empty plot buffers filled by ``comparison`` / ``plot1`` / ``plot2``."""
+        self.eg_rewards: Optional[np.ndarray] = None
+        self.ts_rewards: Optional[np.ndarray] = None
+        self.eg_regrets: Optional[np.ndarray] = None
+        self.ts_regrets: Optional[np.ndarray] = None
+        self.eg_estimates: Optional[np.ndarray] = None
+        self.ts_estimates: Optional[np.ndarray] = None
+
     def plot1(
         self,
-        algorithm_name: str,
-        rewards: np.ndarray,
-        true_means: Sequence[float],
+        algorithm_name: Optional[str] = None,
+        rewards: Optional[np.ndarray] = None,
+        true_means: Optional[Sequence[float]] = None,
         estimates_over_time: Optional[np.ndarray] = None,
         save_path: Optional[Path] = None,
     ) -> None:
-        """Visualize the learning process for one algorithm (linear and log x-axis).
+        """Visualize the learning process for each algorithm (linear and log).
+
+        With no arguments, plots both algorithms using data stored on this
+        instance (set by ``comparison()``).
 
         Parameters
         ----------
-        algorithm_name : str
+        algorithm_name : str, optional
             Label used in titles (e.g. ``EpsilonGreedy``).
-        rewards : np.ndarray
+        rewards : np.ndarray, optional
             Observed reward at each trial, shape ``(T,)``.
-        true_means : Sequence[float]
+        true_means : Sequence[float], optional
             True mean reward of each advertisement / arm.
         estimates_over_time : np.ndarray, optional
             Estimated means after each trial, shape ``(T, K)``.
         save_path : Path, optional
             If given, figure is written here instead of only shown.
         """
+        if true_means is None:
+            true_means = Bandit_Reward
+
+        # Zero-arg form from the starter: plot both algorithms if data is ready
+        if algorithm_name is None and rewards is None:
+            if self.eg_rewards is None or self.ts_rewards is None:
+                raise RuntimeError("No experiment data yet. Run comparison() first.")
+            self.plot1(
+                "EpsilonGreedy",
+                self.eg_rewards,
+                true_means,
+                estimates_over_time=self.eg_estimates,
+                save_path=FIG_DIR / "plot1_epsilon_greedy.png",
+            )
+            self.plot1(
+                "ThompsonSampling",
+                self.ts_rewards,
+                true_means,
+                estimates_over_time=self.ts_estimates,
+                save_path=FIG_DIR / "plot1_thompson_sampling.png",
+            )
+            return
+
+        if rewards is None or algorithm_name is None:
+            raise ValueError("plot1 requires algorithm_name and rewards, or stored data.")
+
         t = np.arange(1, len(rewards) + 1)
         cumulative_avg = np.cumsum(rewards) / t
         optimal = float(np.max(true_means))
@@ -135,23 +173,38 @@ class Visualization:
 
     def plot2(
         self,
-        eg_rewards: np.ndarray,
-        ts_rewards: np.ndarray,
-        eg_regrets: np.ndarray,
-        ts_regrets: np.ndarray,
+        eg_rewards: Optional[np.ndarray] = None,
+        ts_rewards: Optional[np.ndarray] = None,
+        eg_regrets: Optional[np.ndarray] = None,
+        ts_regrets: Optional[np.ndarray] = None,
         save_path: Optional[Path] = None,
     ) -> None:
         """Compare Epsilon-Greedy and Thompson Sampling cumulative rewards and regrets.
 
+        With no arguments, uses data stored on this instance.
+
         Parameters
         ----------
-        eg_rewards, ts_rewards : np.ndarray
+        eg_rewards, ts_rewards : np.ndarray, optional
             Per-trial rewards for each algorithm.
-        eg_regrets, ts_regrets : np.ndarray
+        eg_regrets, ts_regrets : np.ndarray, optional
             Per-trial instantaneous regrets for each algorithm.
         save_path : Path, optional
             If given, figure is written here.
         """
+        if eg_rewards is None:
+            eg_rewards = self.eg_rewards
+        if ts_rewards is None:
+            ts_rewards = self.ts_rewards
+        if eg_regrets is None:
+            eg_regrets = self.eg_regrets
+        if ts_regrets is None:
+            ts_regrets = self.ts_regrets
+        if eg_rewards is None or ts_rewards is None or eg_regrets is None or ts_regrets is None:
+            raise RuntimeError("No experiment data yet. Run comparison() first.")
+        if save_path is None:
+            save_path = FIG_DIR / "plot2_comparison.png"
+
         t = np.arange(1, len(eg_rewards) + 1)
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         fig.suptitle("Epsilon-Greedy vs Thompson Sampling", fontsize=14)
@@ -173,10 +226,9 @@ class Visualization:
         axes[1].grid(True, alpha=0.3)
 
         fig.tight_layout()
-        if save_path is not None:
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(save_path, dpi=150, bbox_inches="tight")
-            logger.info(f"Saved plot2 comparison to {save_path}")
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        logger.info(f"Saved plot2 comparison to {save_path}")
         plt.close(fig)
 
 
@@ -595,21 +647,42 @@ class ThompsonSampling(Bandit):
 
 
 def comparison(
-    eg: EpsilonGreedy,
-    ts: ThompsonSampling,
+    eg: Optional[EpsilonGreedy] = None,
+    ts: Optional[ThompsonSampling] = None,
     viz: Optional[Visualization] = None,
-) -> None:
+) -> Visualization:
     """Compare Epsilon-Greedy and Thompson Sampling visually and in the logs.
+
+    Matches the starter ``comparison()`` zero-arg form: if ``eg`` / ``ts`` are
+    omitted, both experiments are run automatically.
 
     Parameters
     ----------
-    eg : EpsilonGreedy
+    eg : EpsilonGreedy, optional
         Runner that has already executed ``experiment()``.
-    ts : ThompsonSampling
+    ts : ThompsonSampling, optional
         Runner that has already executed ``experiment()``.
     viz : Visualization, optional
         Plot helper; a new instance is created if omitted.
+
+    Returns
+    -------
+    Visualization
+        Plot helper holding both algorithms' results.
     """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    CSV_DIR.mkdir(parents=True, exist_ok=True)
+    FIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    if eg is None:
+        eg = EpsilonGreedy(p=0.0)
+        eg.experiment()
+        eg.report()
+    if ts is None:
+        ts = ThompsonSampling(p=0.0)
+        ts.experiment()
+        ts.report()
+
     if eg.rewards is None or ts.rewards is None:
         raise RuntimeError("Run both experiments before comparison().")
     if eg.regrets is None or ts.regrets is None:
@@ -618,17 +691,24 @@ def comparison(
     if viz is None:
         viz = Visualization()
 
+    viz.eg_rewards = eg.rewards
+    viz.ts_rewards = ts.rewards
+    viz.eg_regrets = eg.regrets
+    viz.ts_regrets = ts.regrets
+    viz.eg_estimates = eg.estimates_over_time
+    viz.ts_estimates = ts.estimates_over_time
+
     viz.plot1(
         "EpsilonGreedy",
         eg.rewards,
-        BANDIT_REWARDS,
+        Bandit_Reward,
         estimates_over_time=eg.estimates_over_time,
         save_path=FIG_DIR / "plot1_epsilon_greedy.png",
     )
     viz.plot1(
         "ThompsonSampling",
         ts.rewards,
-        BANDIT_REWARDS,
+        Bandit_Reward,
         estimates_over_time=ts.estimates_over_time,
         save_path=FIG_DIR / "plot1_thompson_sampling.png",
     )
@@ -640,7 +720,7 @@ def comparison(
         save_path=FIG_DIR / "plot2_comparison.png",
     )
 
-    # Combined CSV required by the assignment schema
+    # Combined CSV required by the assignment schema {Bandit, Reward, Algorithm}
     combined = pd.concat(
         [
             pd.DataFrame(
@@ -673,20 +753,18 @@ def comparison(
         f"Comparison | EG cumulative regret={eg.regrets.sum():.2f}, "
         f"TS cumulative regret={ts.regrets.sum():.2f}"
     )
+    return viz
 
 
 if __name__ == "__main__":
+    # Starter template: demonstrate loguru levels (not a runtime failure)
     logger.debug("debug message")
     logger.info("info message")
     logger.warning("warning message")
     logger.error("error message")
     logger.critical("critical message")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    CSV_DIR.mkdir(parents=True, exist_ok=True)
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Use a non-interactive backend-friendly workflow (figures are saved to disk)
+    # Non-interactive backend so graders / CI can run without a display
     plt.switch_backend("Agg")
 
     eg_runner = EpsilonGreedy(p=0.0)
