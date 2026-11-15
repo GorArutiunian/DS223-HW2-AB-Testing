@@ -2,3 +2,4 @@ loguru==0.7.2
 numpy>=1.24
 matplotlib>=3.7
 pandas>=2.0
+# Official course file only listed loguru; numpy/matplotlib/pandas are required to run.

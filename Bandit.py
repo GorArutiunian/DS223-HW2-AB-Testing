@@ -22,14 +22,16 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-# Experiment constants from the assignment
-BANDIT_REWARDS: List[float] = [1.0, 2.0, 3.0, 4.0]
-NUMBER_OF_TRIALS: int = 20_000
+# Experiment constants from the assignment (exact names + aliases)
+Bandit_Reward: List[float] = [1, 2, 3, 4]
+NumberOfTrials: int = 20000
+BANDIT_REWARDS: List[float] = list(Bandit_Reward)
+NUMBER_OF_TRIALS: int = NumberOfTrials
 
 # Algorithm hyperparameters (assignment: values are up to us)
-INITIAL_EPSILON: float = 1.0  # epsilon_t = INITIAL_EPSILON / t
+INITIAL_EPSILON: float = 1.0  # epsilon_t = INITIAL_EPSILON / t  (decay by 1/t)
 KNOWN_PRECISION: float = 1.0  # tau: reward ~ N(mu, 1/tau)
-PRIOR_PRECISION: float = 0.0001  # weakly informative prior on the mean
+PRIOR_PRECISION: float = 1.0  # Normal prior precision on the mean (course-standard)
 RANDOM_SEED: int = 42
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
