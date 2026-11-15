@@ -31,7 +31,8 @@ NUMBER_OF_TRIALS: int = NumberOfTrials
 # Algorithm hyperparameters (assignment: values are up to us)
 INITIAL_EPSILON: float = 1.0  # epsilon_t = INITIAL_EPSILON / t  (decay by 1/t)
 KNOWN_PRECISION: float = 1.0  # tau: reward ~ N(mu, 1/tau)
-PRIOR_PRECISION: float = 1.0  # Normal prior precision on the mean (course-standard)
+# Weak prior: means are [1,2,3,4], so N(0,1) is too strong and over-pulls suboptimal arms.
+PRIOR_PRECISION: float = 0.0001
 RANDOM_SEED: int = 42
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
